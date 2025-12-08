@@ -1,26 +1,29 @@
-import {BrowserRouter as Router, Route, Routes} from 'react-router-dom';
-import ProductList from "./pages/ProductList";
-import ProductDetails from "./pages/ProductDetails";
-import Nabvar from './components/Navbar';
-import CartPage from './pages/CartPage';
-import CheckoutPage from './pages/CheckoutPage';
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import Navbar from './components/Navbar';
+import HomePage from './pages/HomePage';
+import BlogPage from './pages/BlogPage';
+import Dashboard from './pages/Dashboard';
+import CreatePost from './pages/CreatePost';
+import Login from './pages/Login';
+import Signup from './pages/Signup';
 import PrivateRouter from './components/PrivateRouter';
 
 function App() {
     return (
         <Router>
-            <Nabvar/>
+            <Navbar />
             <Routes>
-                <Route path="/" element={<ProductList/>}/>
-                <Route path="/product/:id" element={<ProductDetails/>}/>
-                <Route path="/cart" element={<CartPage/>}/>
-                <Route element={<PrivateRouter/>}>
-                    <Route path="/checkout" element={<CheckoutPage/>}/>
+                {/* Public Pages */}
+                <Route path="/" element={<HomePage />} />
+                <Route path="/blog/:slug" element={<BlogPage />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<Signup />} />
+
+                {/* Protected Routes */}
+                <Route element={<PrivateRouter />}>
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/create-post" element={<CreatePost />} />
                 </Route>
-                <Route path="/login" element={<Login/>} />
-                <Route path="/signup" element={<Signup/>} />
             </Routes>
         </Router>
     );
