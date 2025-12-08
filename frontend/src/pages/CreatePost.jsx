@@ -6,39 +6,36 @@ export default function CreatePost() {
     const [title, setTitle] = useState("");
     const [content, setContent] = useState("");
     const [category, setCategory] = useState("");
-    const [categories, setCategories] = useState([
-        { id: 1, name: "Technology" },
-        { id: 2, name: "Health" },
-        { id: 3, name: "Travel" },
-        { id: 4, name: "Education" },
-        { id: 5, name: "Lifestyle" },
-        { id: 6, name: "Sports" },
-    ]);
+    const [categories, setCategories] = useState([]);
     const navigate = useNavigate();
 
-    // Merge backend categories with default ones
+    // Fetch categories from backend
     useEffect(() => {
         axios.get("/api/categories/")
             .then(res => {
-                const backendCategories = res.data;
-                const merged = [...categories];
-                backendCategories.forEach(cat => {
-                    if (!merged.some(c => c.id === cat.id)) {
-                        merged.push(cat);
-                    }
-                });
-                setCategories(merged);
+                const categoryData = Array.isArray(res.data) ? res.data : [];
+                setCategories(categoryData);
             })
             .catch(err => console.error("Error fetching categories:", err));
     }, []);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (!category) {
+            alert("Please select a category.");
+            return;
+        }
+
         try {
-            await axios.post("/api/posts/create/", { title, content, category });
+            await axios.post("/api/posts/create/", {
+                title,
+                content,
+                category_id: category  // match serializer write_only field
+            });
             navigate("/dashboard");
         } catch (err) {
             console.error("Error creating post:", err);
+            alert("Failed to create post. Check console for details.");
         }
     };
 
@@ -73,7 +70,10 @@ export default function CreatePost() {
                     rows={6}
                     required
                 />
-                <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded">
+                <button
+                    type="submit"
+                    className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
+                >
                     Create Post
                 </button>
             </form>

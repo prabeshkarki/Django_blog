@@ -2,42 +2,44 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import Category, Post
 
-# --------------------------
-# Category serializer
-# --------------------------
+# -----------------------------
+# Category Serializer
+# -----------------------------
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
-        fields = ['id', 'name', 'slug']
+        fields = ['id', 'name', 'slug']  # adjust 'slug' field if exists in your model
 
-
-# --------------------------
-# Post serializer
-# --------------------------
+# -----------------------------
+# Post Serializer
+# -----------------------------
 class PostSerializer(serializers.ModelSerializer):
-    author = serializers.StringRelatedField(read_only=True)  # shows username
-    category = CategorySerializer(read_only=True)
+    author = serializers.StringRelatedField(read_only=True)
+    category = CategorySerializer(read_only=True)  # nested for GET
+    category_id = serializers.PrimaryKeyRelatedField(
+        queryset=Category.objects.all(),
+        source='category',
+        write_only=True  # for creating/updating posts
+    )
 
     class Meta:
         model = Post
         fields = [
-            'id', 'title', 'slug', 'author', 'category',
+            'id', 'title', 'slug', 'author', 'category', 'category_id',
             'content', 'created_at', 'updated_at', 'published'
         ]
 
-
-# --------------------------
-# User serializer
-# --------------------------
+# -----------------------------
+# User Serializer
+# -----------------------------
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'email']
 
-
-# --------------------------
-# Register serializer
-# --------------------------
+# -----------------------------
+# Register Serializer
+# -----------------------------
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
     password2 = serializers.CharField(write_only=True)

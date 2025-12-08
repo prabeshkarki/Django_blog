@@ -24,6 +24,7 @@ class Post(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     published = models.BooleanField(default=True)
+    # image = models.ImageField(upload_to='post_images/', null=True, blank=True)
 
     def save(self, *args, **kwargs):
         if not self.slug:

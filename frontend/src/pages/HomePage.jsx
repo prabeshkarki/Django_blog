@@ -9,16 +9,29 @@ export default function HomePage() {
 
     // Fetch all posts
     useEffect(() => {
-        const url = selectedCategory ? `/api/posts/?category=${selectedCategory}` : "/api/posts/";
-        axios.get(url)
-            .then(res => setPosts(res.data))
+        const url = selectedCategory
+            ? `/api/posts/?category=${selectedCategory}`
+            : "/api/posts/";
+
+        axios
+            .get(url)
+            .then(res => {
+                // Ensure we have an array
+                const postData = Array.isArray(res.data) ? res.data : [];
+                setPosts(postData);
+            })
             .catch(err => console.error("Error fetching posts:", err));
     }, [selectedCategory]);
 
     // Fetch categories for filter dropdown
     useEffect(() => {
-        axios.get("/api/categories/")
-            .then(res => setCategories(res.data))
+        axios
+            .get("/api/categories/")
+            .then(res => {
+                // Ensure we have an array
+                const categoryData = Array.isArray(res.data) ? res.data : [];
+                setCategories(categoryData);
+            })
             .catch(err => console.error("Error fetching categories:", err));
     }, []);
 
@@ -41,16 +54,30 @@ export default function HomePage() {
                 </select>
             </div>
 
+            {/* Posts Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {posts.map(post => (
-                    <div key={post.id} className="p-4 border rounded shadow hover:shadow-lg transition">
+                    <div
+                        key={post.id}
+                        className="p-4 border rounded shadow hover:shadow-lg transition"
+                    >
                         <h2 className="text-xl font-semibold mb-2">{post.title}</h2>
-                        <p className="text-gray-700 mb-2">{post.content.slice(0, 120)}...</p>
-                        <Link to={`/blog/${post.slug}`} className="text-blue-600 hover:underline">
+                        <p className="text-gray-700 mb-2">{post.content?.slice(0, 120)}...</p>
+                        <Link
+                            to={`/blog/${post.slug}`}
+                            className="text-blue-600 hover:underline"
+                        >
                             Read more
                         </Link>
                     </div>
                 ))}
+
+                {/* Show message if no posts */}
+                {posts.length === 0 && (
+                    <p className="text-gray-500 col-span-full">
+                        No posts found for this category.
+                    </p>
+                )}
             </div>
         </div>
     );

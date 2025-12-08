@@ -1,58 +1,118 @@
-from rest_framework import serializers, status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
-from django.contrib.auth.models import User
+from rest_framework import status
+
 from .models import Category, Post
+from .serializers import CategorySerializer, PostSerializer, RegisterSerializer, UserSerializer
 
-# --------------------------
-# Serializers
-# --------------------------
-class CategorySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Category
-        fields = ['id', 'name', 'slug']
+# -----------------------------
+# Categories
+# -----------------------------
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_categories(request):
+    categories = Category.objects.all()
+    serializer = CategorySerializer(categories, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
 
-class PostSerializer(serializers.ModelSerializer):
-    author = serializers.StringRelatedField(read_only=True)
-    category = CategorySerializer(read_only=True)
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_category(request):
+    serializer = CategorySerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    class Meta:
-        model = Post
-        fields = [
-            'id', 'title', 'slug', 'author', 'category',
-            'content', 'created_at', 'updated_at', 'published'
-        ]
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_category(request, pk):
+    try:
+        category = Category.objects.get(pk=pk)
+        category.delete()
+        return Response({"detail": "Category deleted"}, status=status.HTTP_204_NO_CONTENT)
+    except Category.DoesNotExist:
+        return Response({"detail": "Category not found"}, status=status.HTTP_404_NOT_FOUND)
 
-class UserSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = ['id', 'username', 'email']
+# -----------------------------
+# Posts (List + Filter)
+# -----------------------------
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_posts(request):
+    category_id = request.GET.get('category')
+    posts = Post.objects.filter(published=True).order_by('-created_at')
+    if category_id:
+        posts = posts.filter(category_id=category_id)
+    serializer = PostSerializer(posts, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
 
-class RegisterSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True)
-    password2 = serializers.CharField(write_only=True)
+# -----------------------------
+# Single Post by Slug
+# -----------------------------
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_post(request, slug):
+    try:
+        post = Post.objects.get(slug=slug, published=True)
+    except Post.DoesNotExist:
+        return Response({"detail": "Post not found"}, status=status.HTTP_404_NOT_FOUND)
+    serializer = PostSerializer(post)
+    return Response(serializer.data, status=status.HTTP_200_OK)
 
-    class Meta:
-        model = User
-        fields = ['username', 'email', 'password', 'password2']
+# -----------------------------
+# Create Post
+# -----------------------------
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_post(request):
+    serializer = PostSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save(author=request.user)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def validate(self, data):
-        if data['password'] != data['password2']:
-            raise serializers.ValidationError("Passwords do not match.")
-        return data
+# -----------------------------
+# Update Post
+# -----------------------------
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def update_post(request, pk):
+    try:
+        post = Post.objects.get(pk=pk)
+    except Post.DoesNotExist:
+        return Response({"detail": "Post not found"}, status=status.HTTP_404_NOT_FOUND)
 
-    def create(self, validated_data):
-        username = validated_data['username']
-        email = validated_data.get('email', '')
-        password = validated_data['password']
-        user = User.objects.create_user(username=username, email=email, password=password)
-        return user
+    if post.author != request.user:
+        return Response({"detail": "Not authorized"}, status=status.HTTP_403_FORBIDDEN)
 
-# --------------------------
-# Views / API Endpoints
-# --------------------------
+    serializer = PostSerializer(post, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# -----------------------------
+# Delete Post
+# -----------------------------
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_post(request, pk):
+    try:
+        post = Post.objects.get(pk=pk)
+    except Post.DoesNotExist:
+        return Response({"detail": "Post not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    if post.author != request.user:
+        return Response({"detail": "Not authorized"}, status=status.HTTP_403_FORBIDDEN)
+
+    post.delete()
+    return Response({"detail": "Post deleted"}, status=status.HTTP_204_NO_CONTENT)
+
+# -----------------------------
 # User Registration
+# -----------------------------
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_view(request):
@@ -64,67 +124,3 @@ def register_view(request):
             status=status.HTTP_201_CREATED
         )
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-# Get all categories
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def get_categories(request):
-    categories = Category.objects.all()
-    serializer = CategorySerializer(categories, many=True)
-    return Response(serializer.data)
-
-# Get all published posts
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def get_posts(request):
-    posts = Post.objects.filter(published=True).order_by('-created_at')
-    serializer = PostSerializer(posts, many=True)
-    return Response(serializer.data)
-
-# Get single post by slug
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def get_post(request, slug):
-    try:
-        post = Post.objects.get(slug=slug, published=True)
-        serializer = PostSerializer(post)
-        return Response(serializer.data)
-    except Post.DoesNotExist:
-        return Response({'error': 'Post not found'}, status=404)
-
-# Create a new post (authenticated users only)
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def create_post(request):
-    serializer = PostSerializer(data=request.data)
-    if serializer.is_valid():
-        serializer.save(author=request.user)
-        return Response(serializer.data, status=201)
-    return Response(serializer.errors, status=400)
-
-# Update post
-@api_view(['PUT'])
-@permission_classes([IsAuthenticated])
-def update_post(request, pk):
-    try:
-        post = Post.objects.get(pk=pk)
-    except Post.DoesNotExist:
-        return Response({'error': 'Post not found'}, status=404)
-    
-    serializer = PostSerializer(post, data=request.data, partial=True)
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data)
-    return Response(serializer.errors, status=400)
-
-# Delete post
-@api_view(['DELETE'])
-@permission_classes([IsAuthenticated])
-def delete_post(request, pk):
-    try:
-        post = Post.objects.get(pk=pk)
-    except Post.DoesNotExist:
-        return Response({'error': 'Post not found'}, status=404)
-    
-    post.delete()
-    return Response({'message': 'Post deleted successfully'}, status=204)

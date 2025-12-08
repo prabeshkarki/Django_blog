@@ -18,10 +18,10 @@ function Navbar() {
 
             <div className='flex items-center gap-6'>
                 {/* Always visible links */}
-                <Link to='/HomePage' className='text-gray-800 hover:text-gray-600 font-medium'>
+                <Link to='/homepage' className='text-gray-800 hover:text-gray-600 font-medium'>
                     Home
                 </Link>
-                <Link to='/blog' className='text-gray-800 hover:text-gray-600 font-medium'>
+                <Link to='/blog/:slug' className='text-gray-800 hover:text-gray-600 font-medium'>
                     Blog
                 </Link>
 
