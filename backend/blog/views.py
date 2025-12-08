@@ -36,17 +36,55 @@ def delete_category(request, pk):
         return Response({"detail": "Category not found"}, status=status.HTTP_404_NOT_FOUND)
 
 # -----------------------------
-# Posts (List + Filter)
+# Posts - FIXED WITH ERROR HANDLING
 # -----------------------------
-@api_view(['GET'])
+@api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
-def get_posts(request):
-    category_id = request.GET.get('category')
-    posts = Post.objects.filter(published=True).order_by('-created_at')
-    if category_id:
-        posts = posts.filter(category_id=category_id)
-    serializer = PostSerializer(posts, many=True)
-    return Response(serializer.data, status=status.HTTP_200_OK)
+def posts_view(request):
+    try:
+        if request.method == 'GET':
+            # Handle GET request (list posts)
+            category_id = request.GET.get('category')
+            posts = Post.objects.filter(published=True).order_by('-created_at')
+            if category_id:
+                posts = posts.filter(category_id=category_id)
+            serializer = PostSerializer(posts, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        
+        elif request.method == 'POST':
+            # Handle POST request (create post)
+            if not request.user.is_authenticated:
+                return Response(
+                    {"detail": "Authentication required"}, 
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            # Pass request context to serializer
+            serializer = PostSerializer(
+                data=request.data, 
+                context={'request': request}  # IMPORTANT: Pass request context
+            )
+            
+            if serializer.is_valid():
+                # Don't pass author here - let serializer handle it
+                serializer.save()  # Author will be auto-set from request.user
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+    except Exception as e:
+        # Log the error for debugging
+        import traceback
+        print(f"Error in posts_view: {str(e)}")
+        print(traceback.format_exc())
+        
+        return Response(
+            {
+                "detail": "Internal server error",
+                "error": str(e) if request.user.is_staff else None
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 # -----------------------------
 # Single Post by Slug
@@ -56,59 +94,64 @@ def get_posts(request):
 def get_post(request, slug):
     try:
         post = Post.objects.get(slug=slug, published=True)
-    except Post.DoesNotExist:
-        return Response({"detail": "Post not found"}, status=status.HTTP_404_NOT_FOUND)
-    serializer = PostSerializer(post)
-    return Response(serializer.data, status=status.HTTP_200_OK)
-
-# -----------------------------
-# Create Post
-# -----------------------------
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def create_post(request):
-    serializer = PostSerializer(data=request.data)
-    if serializer.is_valid():
-        serializer.save(author=request.user)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-# -----------------------------
-# Update Post
-# -----------------------------
-@api_view(['PUT'])
-@permission_classes([IsAuthenticated])
-def update_post(request, pk):
-    try:
-        post = Post.objects.get(pk=pk)
-    except Post.DoesNotExist:
-        return Response({"detail": "Post not found"}, status=status.HTTP_404_NOT_FOUND)
-
-    if post.author != request.user:
-        return Response({"detail": "Not authorized"}, status=status.HTTP_403_FORBIDDEN)
-
-    serializer = PostSerializer(post, data=request.data, partial=True)
-    if serializer.is_valid():
-        serializer.save()
+        serializer = PostSerializer(post)
         return Response(serializer.data, status=status.HTTP_200_OK)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    except Post.DoesNotExist:
+        return Response(
+            {"detail": "Post not found"}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
 
 # -----------------------------
-# Delete Post
+# Single Post by ID (for update/delete)
 # -----------------------------
-@api_view(['DELETE'])
+@api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated])
-def delete_post(request, pk):
+def post_detail(request, pk):
     try:
         post = Post.objects.get(pk=pk)
     except Post.DoesNotExist:
-        return Response({"detail": "Post not found"}, status=status.HTTP_404_NOT_FOUND)
-
-    if post.author != request.user:
-        return Response({"detail": "Not authorized"}, status=status.HTTP_403_FORBIDDEN)
-
-    post.delete()
-    return Response({"detail": "Post deleted"}, status=status.HTTP_204_NO_CONTENT)
+        return Response(
+            {"detail": "Post not found"}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    if request.method == 'GET':
+        serializer = PostSerializer(post)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    elif request.method == 'PUT':
+        # Check ownership
+        if post.author != request.user:
+            return Response(
+                {"detail": "Not authorized to edit this post"}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        serializer = PostSerializer(
+            post, 
+            data=request.data, 
+            partial=True,
+            context={'request': request}  # Pass context for updates
+        )
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    elif request.method == 'DELETE':
+        # Check ownership
+        if post.author != request.user:
+            return Response(
+                {"detail": "Not authorized to delete this post"}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        post.delete()
+        return Response(
+            {"detail": "Post deleted successfully"}, 
+            status=status.HTTP_204_NO_CONTENT
+        )
 
 # -----------------------------
 # User Registration
@@ -120,7 +163,19 @@ def register_view(request):
     if serializer.is_valid():
         user = serializer.save()
         return Response(
-            {"message": "User created successfully", "user": UserSerializer(user).data},
+            {
+                "message": "User created successfully", 
+                "user": UserSerializer(user).data
+            },
             status=status.HTTP_201_CREATED
         )
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# -----------------------------
+# Get Current User
+# -----------------------------
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def current_user(request):
+    serializer = UserSerializer(request.user)
+    return Response(serializer.data, status=status.HTTP_200_OK)
