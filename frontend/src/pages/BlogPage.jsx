@@ -174,6 +174,21 @@ export default function BlogPage() {
 
     const headings = extractHeadings(post?.content || '');
 
+    // Helper function to get image URL
+    const getImageUrl = (post, type = 'image') => {
+        if (!post) return '/images/default-post.jpg';
+        
+        if (type === 'thumbnail') {
+            return post.image_thumbnail || post.image || '/images/default-thumb.jpg';
+        }
+        
+        if (type === 'profile') {
+            return post.author_profile?.profile_picture || '/images/default-profile.png';
+        }
+        
+        return post.image || '/images/default-post.jpg';
+    };
+
     if (loading) {
         return (
             <div className="min-h-screen bg-gray-50 pt-24">
@@ -181,7 +196,8 @@ export default function BlogPage() {
                     <div className="animate-pulse">
                         <div className="h-8 bg-gray-200 rounded w-3/4 mb-4"></div>
                         <div className="h-4 bg-gray-200 rounded w-1/2 mb-8"></div>
-                        <div className="h-64 bg-gray-200 rounded mb-8"></div>
+                        {/* Image loading skeleton */}
+                        <div className="h-96 bg-gray-200 rounded-2xl mb-8"></div>
                         <div className="space-y-3">
                             <div className="h-4 bg-gray-200 rounded"></div>
                             <div className="h-4 bg-gray-200 rounded"></div>
@@ -299,14 +315,36 @@ export default function BlogPage() {
                                 </div>
                             </div>
 
-                            {/* Featured Image (if available) */}
-                            {post.image && (
+                            {/* FEATURED IMAGE SECTION - FIXED */}
+                            {post.image || post.image_url ? (
                                 <div className="mb-8 rounded-2xl overflow-hidden shadow-xl">
                                     <img 
-                                        src={post.image} 
+                                        src={post.image || post.image_url} 
                                         alt={post.title}
-                                        className="w-full h-auto object-cover"
+                                        className="w-full h-auto max-h-[600px] object-cover"
+                                        onError={(e) => {
+                                            e.target.src = '/images/default-post.jpg';
+                                            e.target.className = 'w-full h-auto max-h-[600px] object-cover bg-gray-100';
+                                        }}
                                     />
+                                    {/* Optional: Image caption */}
+                                    {post.image_caption && (
+                                        <div className="p-4 bg-gray-50 border-t border-gray-200">
+                                            <p className="text-sm text-gray-600 text-center italic">
+                                                {post.image_caption}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                /* Image not available placeholder - FIXED */
+                                <div className="mb-8 rounded-2xl overflow-hidden shadow-xl bg-gradient-to-br from-gray-100 to-gray-200 h-64 flex items-center justify-center">
+                                    <div className="text-center p-8">
+                                        <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                        <p className="text-gray-500">No featured image available</p>
+                                    </div>
                                 </div>
                             )}
                         </header>
@@ -432,16 +470,29 @@ export default function BlogPage() {
                         <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
                             <h3 className="font-bold text-gray-800 mb-4">About the Author</h3>
                             <div className="flex items-center mb-4">
-                                <div className="w-16 h-16 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 flex items-center justify-center text-white text-2xl font-bold mr-4">
-                                    {post.author?.charAt(0)?.toUpperCase() || 'A'}
-                                </div>
+                                {/* Author Profile Picture - FIXED */}
+                                {post.author_profile?.profile_picture || post.author_profile_picture ? (
+                                    <img 
+                                        src={post.author_profile?.profile_picture || post.author_profile_picture} 
+                                        alt={post.author}
+                                        className="w-16 h-16 rounded-full object-cover border-2 border-white shadow-md mr-4"
+                                        onError={(e) => {
+                                            e.target.src = '/images/default-profile.png';
+                                            e.target.className = 'w-16 h-16 rounded-full object-cover border-2 border-white shadow-md mr-4 bg-gray-100';
+                                        }}
+                                    />
+                                ) : (
+                                    <div className="w-16 h-16 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 flex items-center justify-center text-white text-2xl font-bold mr-4">
+                                        {post.author?.charAt(0)?.toUpperCase() || 'A'}
+                                    </div>
+                                )}
                                 <div>
                                     <h4 className="font-bold text-gray-900">{post.author || 'Anonymous'}</h4>
                                     <p className="text-gray-600 text-sm">Blog Contributor</p>
                                 </div>
                             </div>
                             <p className="text-gray-600 text-sm">
-                                {post.author_bio || 'This author hasn\'t written a bio yet.'}
+                                {post.author_bio || post.author_profile?.bio || 'This author hasn\'t written a bio yet.'}
                             </p>
                         </div>
 
@@ -472,15 +523,28 @@ export default function BlogPage() {
                                     {relatedPosts.map(relatedPost => (
                                         <Link 
                                             key={relatedPost.id} 
-                                            to={`/post/${relatedPost.slug || relatedPost.id}`}
+                                            to={`/blog/${relatedPost.slug}`}
                                             className="block group"
                                         >
                                             <div className="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50">
-                                                <div className="w-12 h-12 rounded-lg bg-gradient-to-r from-blue-100 to-indigo-100 flex items-center justify-center text-blue-600 flex-shrink-0">
-                                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                                                    </svg>
-                                                </div>
+                                                {/* Related Post Thumbnail - FIXED */}
+                                                {relatedPost.thumbnail_url || relatedPost.image_thumbnail || relatedPost.image ? (
+                                                    <img 
+                                                        src={relatedPost.thumbnail_url || relatedPost.image_thumbnail || relatedPost.image} 
+                                                        alt={relatedPost.title}
+                                                        className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+                                                        onError={(e) => {
+                                                            e.target.src = '/images/default-thumb.jpg';
+                                                            e.target.className = 'w-12 h-12 rounded-lg object-cover flex-shrink-0 bg-gray-100';
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <div className="w-12 h-12 rounded-lg bg-gradient-to-r from-blue-100 to-indigo-100 flex items-center justify-center text-blue-600 flex-shrink-0">
+                                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                                        </svg>
+                                                    </div>
+                                                )}
                                                 <div>
                                                     <h4 className="font-medium text-gray-900 group-hover:text-blue-600 line-clamp-2">
                                                         {relatedPost.title}
