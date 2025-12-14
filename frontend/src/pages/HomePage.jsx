@@ -154,7 +154,7 @@ export default function HomePage() {
                                     to="/create-post"
                                     className="px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 text-center"
                                 >
-                                    Write a post
+                                    Create a Blog
                                 </Link>
                             )}
                         </div>
